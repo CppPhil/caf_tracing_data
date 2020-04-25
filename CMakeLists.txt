@@ -20,6 +20,8 @@ add_subdirectory(external/actor-framework)
 set(APP_NAME caf_tracing_data_app)
 add_executable(${APP_NAME} src/main.cpp)
 
+find_package(Threads REQUIRED)
+
 target_link_libraries(${APP_NAME} PRIVATE Threads::Threads ${CMAKE_DL_LIBS}
                                           CAF::core CAF::io)
 
