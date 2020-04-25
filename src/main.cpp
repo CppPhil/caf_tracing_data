@@ -1,6 +1,9 @@
+#include <cinttypes>
+#include <cstdint>
 #include <cstdio>
 
 #include <future>
+#include <thread>
 
 #include "caf/all.hpp"
 #include "caf/io/all.hpp"
@@ -47,6 +50,8 @@ struct trc_data_fac : caf::tracing_data_factory {
   }
 };
 
+thread_local std::string data;
+
 struct prof : caf::actor_profiler {
   void add_actor(const caf::local_actor&, const caf::local_actor*) override {
   }
@@ -57,8 +62,7 @@ struct prof : caf::actor_profiler {
   void before_processing(const caf::local_actor& actor,
                          const caf::mailbox_element& element) override {
     if (element.tracing_id == nullptr) {
-      fprintf(stderr,
-              "Unexpected error: tracing_id was null in before_processing!\n");
+      fprintf(stderr, "tracing_id was null in before_processing!\n");
       return;
     }
     const auto* p = dynamic_cast<const trc_data*>(element.tracing_id.get());
@@ -67,6 +71,7 @@ struct prof : caf::actor_profiler {
       return;
     }
     printf("before_processing got \"%s\" tracing_id\n", p->s.c_str());
+    data = p->s;
   }
 
   void after_processing(const caf::local_actor&,
@@ -75,31 +80,33 @@ struct prof : caf::actor_profiler {
 
   void before_sending(const caf::local_actor&,
                       caf::mailbox_element& element) override {
-    element.tracing_id
-      = std::make_unique<trc_data>("before_sending put this here");
+    element.tracing_id = std::make_unique<trc_data>(data);
   }
 
   void before_sending_scheduled(const caf::local_actor& self,
                                 caf::actor_clock::time_point timeout,
                                 caf::mailbox_element& element) override {
-    element.tracing_id
-      = std::make_unique<trc_data>("before_sending_scheduled put this here");
+    element.tracing_id = std::make_unique<trc_data>(data);
   }
 };
 
 caf::behavior actor1(caf::event_based_actor* self) {
   return {
-    [self](std::string s) {
-      caf::aout(self) << "actor1 received: " << s << std::endl;
+    [=](std::string s) {
+      caf::aout(self) << "actor1 received: " << s << " tracing_id: \"" << data << "\""
+                      << std::endl;
+      data = "actor1 put this here";
       return "Thanks for sending: \"" + s + "\"!";
     },
   };
 }
 
 void actor2(caf::event_based_actor* self, const caf::actor& buddy) {
+  data = "actor2 put this here";
   self->request(buddy, caf::infinite, std::string("Hi, I'm actor2."))
-    .then([self](const std::string& res) {
-      caf::aout(self) << "actor2 received: " << res << std::endl;
+    .then([=](const std::string& res) {
+      caf::aout(self) << "actor2 received: " << res << " tracing_id: \"" << data
+                      << "\"" << std::endl;
     });
 }
 
@@ -117,7 +124,7 @@ constexpr char anyaddr[] = "0.0.0.0";
 constexpr uint16_t port = 1337;
 
 #define USE_IO
-void caf_main1(caf::actory_system& sys, const config& config) {
+void caf_main1(caf::actor_system& sys, const config& config) {
 #ifdef USE_IO
   const auto actor = sys.spawn(&actor1);
   const auto exp_port = caf::io::publish(actor, port, anyaddr);
@@ -143,14 +150,12 @@ void caf_main2(caf::actor_system& sys, const config& config) {
 int main(int argc, char** argv) {
   caf::exec_main_init_meta_objects<caf::io::middleman>();
   caf::core::init_global_meta_objects();
-
-  auto fut1 = std::async(std::launch::async, [] {
+  auto fut1 = std::async(std::launch::async, [=] {
     return caf::exec_main<caf::io::middleman>(caf_main1, argc, argv);
   });
-
-  auto fut2 = std::async(std::launch::async, [] {
-    return caf::exec_main<caf::io_middleman>(caf_main2, argc, argv);
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  auto fut2 = std::async(std::launch::async, [=] {
+    return caf::exec_main<caf::io::middleman>(caf_main2, argc, argv);
   });
-
   return fut1.get() | fut2.get();
 }
