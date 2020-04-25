@@ -127,7 +127,7 @@ struct config : caf::actor_system_config {
 constexpr char anyaddr[] = "0.0.0.0";
 constexpr uint16_t port = 1337;
 
-//#define USE_IO
+#define USE_IO
 void caf_main1(caf::actor_system& sys, const config&) {
 #ifdef USE_IO
   const auto actor = sys.spawn(&actor1);
