@@ -57,7 +57,7 @@ fi
 
 cd build
 
-cmake -DCMAKE_BUILD_TYPE=$build_type -DREMOTE=$remote -G "Unix Makefiles" ..
+cmake -DCMAKE_BUILD_TYPE=$build_type -G "Unix Makefiles" ..
 cmake --build . -- -j$(nproc)
 
 cd $PREV_DIR
