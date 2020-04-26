@@ -130,14 +130,14 @@ constexpr uint16_t port = 1337;
 #define USE_IO
 void caf_main1(caf::actor_system& sys, const config&) {
 #ifdef USE_IO
-  const auto actor = sys.spawn(&actor1);
+  const auto actor = sys.spawn(actor1);
   const auto exp_port = caf::io::publish(actor, port, anyaddr);
   if (!exp_port)
     fprintf(stderr, "Couldn't publish actor1 on %s:%" PRIu16 "!\n", anyaddr,
             port);
 #else
-  const auto a1 = sys.spawn(&actor1);
-  sys.spawn(&actor2, a1);
+  const auto a1 = sys.spawn(actor1);
+  sys.spawn(actor2, a1);
 #endif
 }
 
@@ -148,7 +148,7 @@ void caf_main2([[maybe_unused]] caf::actor_system& sys, const config&) {
     fprintf(stderr, "Could not connect to remote actor!\n");
     return;
   }
-  sys.spawn(&actor2, *exp_actor);
+  sys.spawn(actor2, *exp_actor);
 #endif
 }
 
